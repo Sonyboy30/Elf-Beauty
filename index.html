@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELF · e.l.f. Beauty Risk Intelligence Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08090d;--surf:#0f1117;--surf2:#13151e;--border:#1e2130;
+  --accent:#6c63ff;--green:#00d084;--red:#ff4d6d;--amber:#ffb547;
+  --text:#dde1f0;--muted:#5a6182;--dim:#1a1d2e;
+  --pink:#ff6eb4;--sidebar:220px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.mono{font-family:'JetBrains Mono',monospace;}
+.micro{font-size:9px;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);}
+
+/* TICKER TAPE */
+.tape{height:33px;background:var(--surf);border-bottom:1px solid var(--border);display:flex;align-items:center;overflow:hidden;flex-shrink:0;position:relative;z-index:100;}
+.tape-track{display:flex;animation:tickerScroll 60s linear infinite;white-space:nowrap;}
+.tape-track:hover{animation-play-state:paused;}
+.tick-item{display:inline-flex;align-items:center;gap:5px;padding:0 14px;border-right:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:10px;}
+.tick-sym{color:var(--text);font-weight:600;}
+.tick-p{color:var(--muted);}
+.tick-c.up{color:var(--green);}
+.tick-c.dn{color:var(--red);}
+@keyframes tickerScroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+
+/* LAYOUT */
+.app{display:flex;flex:1;overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar);background:var(--surf);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;overflow-x:hidden;}
+.brand{padding:16px 14px 12px;border-bottom:1px solid var(--border);}
+.brand-row{display:flex;align-items:center;gap:9px;}
+.brand-logo{width:28px;height:28px;background:linear-gradient(135deg,var(--pink),var(--accent));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#fff;flex-shrink:0;}
+.brand-name{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;}
+.brand-sub{font-size:9px;color:var(--muted);margin-top:2px;}
+
+.nav-section{padding:10px 0;}
+.nav-label{padding:4px 14px;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;transition:.15s;font-size:12px;color:var(--muted);border-left:2px solid transparent;}
+.nav-item:hover{color:var(--text);background:rgba(108,99,255,.06);}
+.nav-item.active{color:var(--text);background:rgba(108,99,255,.1);border-left-color:var(--accent);}
+.nav-item .nav-icon{font-size:13px;width:16px;text-align:center;flex-shrink:0;}
+.nav-item .nav-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.risk-badge{padding:1px 5px;border-radius:3px;font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:600;flex-shrink:0;}
+.rb-low{background:rgba(0,208,132,.15);color:var(--green);}
+.rb-mod{background:rgba(255,181,71,.15);color:var(--amber);}
+.rb-high{background:rgba(255,77,109,.15);color:var(--red);}
+
+.sidebar-footer{margin-top:auto;padding:10px 14px;border-top:1px solid var(--border);}
+.live-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.live-text{font-size:10px;color:var(--green);font-weight:600;letter-spacing:.8px;}
+.time-text{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted);}
+.sidebar-btn{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--dim);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;color:var(--muted);transition:.15s;width:100%;margin-top:4px;}
+.sidebar-btn:hover{border-color:var(--accent);color:var(--text);}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;}
+.page{display:none;padding:28px 32px;animation:fadeUp .4s ease;}
+.page.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+/* PAGE HEADER */
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px;}
+.page-sub{font-size:12px;color:var(--muted);}
+
+/* CARDS */
+.card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;transition:.18s;}
+.card:hover{border-color:rgba(108,99,255,.35);box-shadow:0 6px 24px rgba(108,99,255,.1);transform:translateY(-2px);}
+.card-title{font-size:11px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+/* HOME HERO */
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0;}
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
+.stat-box{background:var(--dim);border-radius:7px;padding:10px 12px;}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;margin-bottom:2px;}
+.stat-lbl{font-size:10px;color:var(--muted);}
+
+/* MARKET SNAPSHOT */
+.snap-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:14px 0;}
+.snap-card{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:12px 12px 0;position:relative;overflow:hidden;transition:.15s;}
+.snap-card:hover{border-color:rgba(108,99,255,.3);}
+.snap-label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+.snap-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;margin:4px 0 3px;}
+.snap-chg{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 5px;border-radius:3px;margin-bottom:10px;}
+.snap-chg.up{background:rgba(0,208,132,.15);color:var(--green);}
+.snap-chg.dn{background:rgba(255,77,109,.15);color:var(--red);}
+.snap-bar{height:2px;width:100%;margin-top:auto;}
+
+/* STOCK CARDS GRID */
+.stocks-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px;}
+.stock-card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:.18s;}
+.stock-card:hover{border-color:var(--accent);box-shadow:0 6px 24px rgba(108,99,255,.15);transform:translateY(-2px);}
+.sc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.ticker-pill{padding:3px 8px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;background:rgba(255,110,180,.15);color:var(--pink);}
+.sc-risk{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;}
+.sc-name{font-size:13px;font-weight:600;margin-bottom:2px;}
+.sc-sector{font-size:10px;color:var(--muted);margin-bottom:10px;}
+.sc-price-row{display:flex;align-items:baseline;gap:7px;margin-bottom:10px;}
+.sc-price{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;}
+.chg-pill{padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:10px;}
+.chg-pill.up{background:rgba(0,208,132,.15);color:var(--green);}
+.chg-pill.dn{background:rgba(255,77,109,.15);color:var(--red);}
+.sc-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
+.sc-metric{background:var(--dim);border-radius:5px;padding:5px 7px;}
+.sc-metric-lbl{font-size:8px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);}
+.sc-metric-val{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;margin-top:1px;}
+.risk-bar-wrap{margin-bottom:10px;}
+.risk-bar-track{height:4px;background:var(--dim);border-radius:2px;overflow:hidden;}
+.risk-bar-fill{height:100%;border-radius:2px;transition:.3s;}
+.sc-bottom{display:flex;align-items:center;justify-content:space-between;}
+.rating-badge{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px;}
+.rb-buy{background:rgba(0,208,132,.15);color:var(--green);}
+.rb-hold{background:rgba(255,181,71,.15);color:var(--amber);}
+.rb-sell{background:rgba(255,77,109,.15);color:var(--red);}
+.rb-sbuy{background:rgba(0,208,132,.25);color:var(--green);}
+.sc-arrow{color:var(--muted);font-size:16px;}
+.add-card{background:transparent;border:1px dashed var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:.18s;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:240px;gap:8px;}
+.add-card:hover{border-color:var(--accent);background:rgba(108,99,255,.04);}
+.add-icon{font-size:28px;color:var(--muted);}
+.add-text{font-size:12px;color:var(--muted);}
+
+/* DETAIL PAGE */
+.detail-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding:18px;background:var(--surf);border:1px solid var(--border);border-radius:10px;}
+.dh-left{}
+.dh-ticker{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:4px 10px;background:rgba(255,110,180,.15);color:var(--pink);border-radius:6px;display:inline-block;margin-bottom:6px;}
+.dh-name{font-size:20px;font-weight:700;margin-bottom:3px;}
+.dh-sector{font-size:12px;color:var(--muted);}
+.dh-right{text-align:right;}
+.dh-price{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;margin-bottom:4px;}
+.dh-meta{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+.dh-meta-item{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.dh-meta-item span{color:var(--text);}
+
+/* SUBTABS */
+.subtabs{display:flex;gap:4px;margin-bottom:18px;background:var(--dim);padding:4px;border-radius:8px;width:fit-content;}
+.subtab{padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--muted);transition:.15s;}
+.subtab.active{background:var(--surf);color:var(--text);}
+.subpage{display:none;}
+.subpage.active{display:block;}
+
+/* RISK GAUGE */
+.gauge-kpi{display:grid;grid-template-columns:200px 1fr;gap:14px;margin-bottom:16px;}
+.gauge-box{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;}
+.gauge-num{font-family:'JetBrains Mono',monospace;font-size:52px;font-weight:700;line-height:1;}
+.gauge-label{font-size:11px;letter-spacing:.8px;text-transform:uppercase;margin-top:6px;}
+.gauge-tier{font-size:11px;font-weight:600;margin-top:4px;}
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.kpi-tile{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:12px;}
+.kpi-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.kpi-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;margin-bottom:4px;}
+.kpi-delta{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 5px;border-radius:3px;}
+
+/* RISK BREAKDOWN */
+.risk-breakdown{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
+.rb-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.rb-name{font-size:12px;width:220px;flex-shrink:0;}
+.rb-weight{font-size:10px;color:var(--muted);width:80px;flex-shrink:0;}
+.rb-bar-wrap{flex:1;}
+.rb-score{font-family:'JetBrains Mono',monospace;font-size:12px;width:50px;text-align:right;flex-shrink:0;}
+.rb-pct{font-size:10px;color:var(--muted);width:55px;text-align:right;flex-shrink:0;}
+.composite-row{border-top:1px solid var(--border);padding-top:10px;margin-top:4px;}
+.composite-score{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;padding:4px 10px;border-radius:6px;}
+
+/* METRIC GRIDS */
+.metric-section{margin-bottom:18px;}
+.metric-section-title{font-size:12px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.metric-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.metric-card{background:var(--surf);border:1px solid var(--border);border-top:2px solid transparent;border-radius:0 0 8px 8px;padding:13px;}
+.metric-card.green{border-top-color:var(--green);}
+.metric-card.amber{border-top-color:var(--amber);}
+.metric-card.red{border-top-color:var(--red);}
+.mc-label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.mc-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;margin-bottom:5px;}
+.mc-context{font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:8px;}
+.mc-status{display:inline-block;font-size:8px;letter-spacing:.8px;text-transform:uppercase;padding:2px 6px;border-radius:3px;font-weight:600;}
+.mcs-green{background:rgba(0,208,132,.15);color:var(--green);}
+.mcs-amber{background:rgba(255,181,71,.15);color:var(--amber);}
+.mcs-red{background:rgba(255,77,109,.15);color:var(--red);}
+.mcs-blue{background:rgba(108,99,255,.15);color:var(--accent);}
+
+/* QUARTERLY TABLE */
+.qtable{width:100%;border-collapse:collapse;font-size:11px;}
+.qtable th{background:var(--surf2);padding:8px 10px;text-align:left;font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
+.qtable td{padding:9px 10px;border-bottom:1px solid rgba(30,33,48,.6);font-family:'JetBrains Mono',monospace;}
+.qtable tr.highlight{background:rgba(108,99,255,.06);}
+.qtable tr:hover{background:rgba(255,255,255,.02);}
+.beat-pill{padding:2px 5px;border-radius:3px;font-size:9px;font-weight:600;}
+.beat-green{background:rgba(0,208,132,.15);color:var(--green);}
+.beat-amber{background:rgba(255,181,71,.15);color:var(--amber);}
+.beat-fwd{background:rgba(108,99,255,.15);color:var(--accent);}
+
+/* EARNINGS BOX */
+.earnings-box{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;}
+.eb-header{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.eb-headline{font-size:16px;font-weight:700;margin-bottom:12px;line-height:1.3;}
+.eb-bullets{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.eb-bullets li{font-size:12px;color:var(--muted);padding-left:14px;position:relative;line-height:1.4;}
+.eb-bullets li::before{content:'▶';position:absolute;left:0;font-size:8px;color:var(--accent);top:2px;}
+.eb-quote{border-left:2px solid var(--accent);padding:8px 14px;font-style:italic;font-size:11px;color:var(--muted);line-height:1.5;}
+
+/* CATALYSTS/RISKS */
+.dual-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.catalyst-card,.risk-card-item{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;}
+.catalyst-card{border-left:2px solid var(--green);}
+.risk-card-item{border-left:2px solid var(--red);}
+.cr-title{font-size:12px;font-weight:600;margin-bottom:4px;}
+.cr-body{font-size:11px;color:var(--muted);line-height:1.4;margin-bottom:7px;}
+.impact-pill{padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;}
+.ip-high{background:rgba(255,77,109,.15);color:var(--red);}
+.ip-med{background:rgba(255,181,71,.15);color:var(--amber);}
+.ip-low{background:rgba(0,208,132,.15);color:var(--green);}
+
+/* VERDICT */
+.verdict-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.consensus-pill{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;display:inline-block;margin-bottom:10px;}
+.verdict-prose{font-size:12px;color:var(--muted);line-height:1.6;}
+.rating-spectrum{display:flex;gap:2px;margin-bottom:12px;}
+.rs-seg{flex:1;padding:6px 2px;border-radius:4px;text-align:center;font-size:8px;font-weight:600;letter-spacing:.3px;opacity:.35;font-family:'JetBrains Mono',monospace;}
+.rs-seg.active{opacity:1;}
+.rs-str-sell{background:rgba(255,77,109,.2);color:var(--red);}
+.rs-sell{background:rgba(255,120,90,.15);color:#ff7a5c;}
+.rs-hold{background:rgba(255,181,71,.15);color:var(--amber);}
+.rs-buy{background:rgba(0,208,132,.15);color:var(--green);}
+.rs-str-buy{background:rgba(0,208,132,.25);color:var(--green);}
+.pt-cells{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+.pt-cell{background:var(--dim);border-radius:6px;padding:10px;text-align:center;}
+.pt-cell-lbl{font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.pt-cell-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;}
+.verdict-meta{font-size:10px;color:var(--muted);}
+.verdict-meta span{color:var(--text);}
+
+/* MARKET OVERVIEW PAGE */
+.heatmap{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0;}
+.hm-tile{padding:8px 10px;border-radius:6px;cursor:pointer;transition:.15s;min-width:60px;text-align:center;}
+.hm-tile:hover{transform:scale(1.05);}
+.hm-sym{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;}
+.hm-chg{font-family:'JetBrains Mono',monospace;font-size:9px;margin-top:2px;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+.risk-dist-buckets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
+.rd-bucket{background:var(--dim);border-radius:7px;padding:12px;text-align:center;}
+.rd-count{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;}
+.rd-lbl{font-size:10px;margin-top:3px;}
+
+/* TABLE PAGE */
+.big-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:14px;}
+.big-table th{background:var(--surf2);padding:9px 10px;text-align:left;font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);position:sticky;top:0;border-bottom:1px solid var(--border);}
+.big-table td{padding:9px 10px;border-bottom:1px solid rgba(30,33,48,.5);}
+.big-table tr:hover td{background:rgba(255,255,255,.02);}
+.open-btn{padding:4px 10px;background:rgba(108,99,255,.15);border:1px solid rgba(108,99,255,.3);border-radius:4px;color:var(--accent);font-size:10px;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif;}
+.open-btn:hover{background:rgba(108,99,255,.25);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:24px;width:380px;max-width:95vw;}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:18px;}
+.form-field{margin-bottom:14px;}
+.form-label{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;}
+.form-input,.form-select{width:100%;padding:9px 12px;background:var(--dim);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;transition:.15s;}
+.form-input:focus,.form-select:focus{border-color:var(--accent);}
+.form-select{appearance:none;}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+.btn-cancel{padding:8px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;}
+.btn-submit{padding:8px 16px;background:var(--accent);border:1px solid transparent;border-radius:6px;color:#fff;cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;}
+
+/* HOW-TO CARD */
+.howto-card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:14px;}
+.howto-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;}
+.howto-step{background:var(--dim);border-radius:7px;padding:12px;}
+.hs-num{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);margin-bottom:6px;}
+.hs-text{font-size:11px;color:var(--muted);line-height:1.4;}
+
+/* FOOTER */
+.page-footer{padding:14px 32px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:.4px;flex-shrink:0;background:var(--surf);}
+
+/* SECTOR PAGE */
+.sector-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px;}
+.sector-tab{padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;color:var(--muted);background:var(--dim);border:1px solid transparent;transition:.15s;}
+.sector-tab:hover{color:var(--text);}
+.sector-tab.active{color:#fff;}
+.sector-panel{display:none;}
+.sector-panel.active{display:block;}
+.sector-header-card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px;}
+.shc-top{display:flex;align-items:flex-start;justify-content:space-between;}
+.shc-ytd{font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:700;}
+.shc-stats{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;}
+.shc-stat{font-size:11px;color:var(--muted);}
+.shc-stat span{color:var(--text);font-family:'JetBrains Mono',monospace;}
+
+/* Earnings calendar */
+.earnings-cal{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.ec-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--dim);border-radius:6px;font-size:11px;}
+.ec-date{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);}
+.ec-ticker{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--pink);}
+
+/* Top picks */
+.picks-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.pick-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--dim);border-radius:6px;cursor:pointer;transition:.15s;}
+.pick-item:hover{background:rgba(108,99,255,.08);}
+.pi-left{display:flex;align-items:center;gap:8px;}
+.pi-rank{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);width:14px;}
+.pi-sym{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--pink);}
+.pi-name{font-size:11px;color:var(--muted);}
+.pi-score{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;}
+
+/* Sector bar chart */
+.sector-bars{display:flex;flex-direction:column;gap:5px;margin-top:8px;}
+.sb-row{display:flex;align-items:center;gap:8px;font-size:10px;}
+.sb-label{width:90px;color:var(--muted);flex-shrink:0;}
+.sb-bar{height:14px;border-radius:3px;min-width:4px;transition:.3s;}
+.sb-val{font-family:'JetBrains Mono',monospace;font-size:10px;min-width:40px;}
+
+/* Outlook verdict */
+.outlook-box{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:8px;}
+.ob-title{font-size:12px;font-weight:600;margin-bottom:8px;}
+.ob-prose{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;}
+.ob-tags{display:flex;flex-wrap:wrap;gap:5px;}
+.ob-tag{padding:3px 8px;background:var(--dim);border-radius:4px;font-size:10px;color:var(--muted);}
+
+/* MAG7 mini cards */
+.mag7-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:16px;}
+.m7-card{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;transition:.15s;}
+.m7-card:hover{border-color:var(--accent);}
+.m7-sym{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--pink);margin-bottom:3px;}
+.m7-price{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;margin-bottom:2px;}
+.m7-chg{font-family:'JetBrains Mono',monospace;font-size:9px;}
+.m7-risk{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;margin-top:4px;}
+.m7-bar{height:3px;background:var(--dim);border-radius:2px;margin-top:4px;overflow:hidden;}
+.m7-bar-fill{height:100%;border-radius:2px;}
+
+@media(max-width:900px){
+  .sidebar{width:56px;}
+  .nav-name,.brand-name,.brand-sub,.risk-badge,.nav-label,.sidebar-footer .time-text{display:none;}
+  .sidebar-btn span{display:none;}
+  .brand-logo{margin:auto;}
+  .brand-row{justify-content:center;}
+  .snap-grid{grid-template-columns:repeat(3,1fr);}
+  .stocks-grid{grid-template-columns:1fr 1fr;}
+  .two-col{grid-template-columns:1fr;}
+  .dual-col{grid-template-columns:1fr;}
+  .verdict-grid{grid-template-columns:1fr;}
+  .mag7-grid{grid-template-columns:repeat(4,1fr);}
+  .howto-steps{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:600px){
+  .page{padding:14px 12px;}
+  .stocks-grid{grid-template-columns:1fr;}
+  .snap-grid{grid-template-columns:1fr 1fr;}
+  .hero-grid{grid-template-columns:1fr;}
+  .metric-cards{grid-template-columns:1fr 1fr;}
+  .gauge-kpi{grid-template-columns:1fr;}
+}
+@media print{
+  .sidebar,.tape,.modal-overlay,.page-footer{display:none!important;}
+  .main{overflow:visible;}
+  .page{display:block!important;padding:20px;}
+}
+</style>
+</head>
+<body>
+
+<!-- TICKER TAPE -->
+<div class="tape">
+  <div class="tape-track" id="tapeTrack"></div>
+</div>
+
+<div class="app">
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="brand">
+    <div class="brand-row">
+      <div class="brand-logo">ef</div>
+      <div>
+        <div class="brand-name">Risk Tracker</div>
+        <div class="brand-sub">ELF · Claude AI</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Main</div>
+    <div class="nav-item active" onclick="showPage('home')"><span class="nav-icon">🏠</span><span class="nav-name">Home</span></div>
+    <div class="nav-item" onclick="showPage('market')"><span class="nav-icon">📊</span><span class="nav-name">Market Overview</span></div>
+    <div class="nav-item" onclick="showPage('table')"><span class="nav-icon">📋</span><span class="nav-name">All Stocks Table</span></div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">ELF Reports</div>
+    <div class="nav-item" onclick="showPage('stock-ELF')"><span class="nav-icon">💄</span><span class="nav-name">ELF · e.l.f. Beauty</span><span class="risk-badge rb-mod">52</span></div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Peers</div>
+    <div class="nav-item" onclick="showPage('sector')"><span class="nav-icon">🏭</span><span class="nav-name">Sector Hub</span></div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="live-row">
+      <div class="live-dot"></div>
+      <span class="live-text">LIVE</span>
+      <span class="time-text" id="clock"></span>
+    </div>
+    <button class="sidebar-btn" onclick="document.getElementById('addModal').classList.add('open')">➕ <span>Add a Stock</span></button>
+    <button class="sidebar-btn" onclick="window.print()">🖨️ <span>Print / PDF</span></button>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+<!-- ═══════════════ HOME PAGE ═══════════════ -->
+<div class="page active" id="page-home">
+  <div class="page-title">e.l.f. Beauty Risk Dashboard</div>
+  <div class="page-sub">May 22, 2026 · 1 core stock · Consumer Staples · Q4 FY2026 Just Reported</div>
+
+  <div class="hero-grid">
+    <div class="card">
+      <div class="card-title">Portfolio Overview</div>
+      <div class="hero-stats">
+        <div class="stat-box"><div class="stat-val mono" style="color:var(--green)">1</div><div class="stat-lbl">Stocks Tracked</div></div>
+        <div class="stat-box"><div class="stat-val mono" style="color:var(--amber)">1</div><div class="stat-lbl">HOLD</div></div>
+        <div class="stat-box"><div class="stat-val mono" style="color:var(--amber)">52</div><div class="stat-lbl">Avg Risk Score</div></div>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:var(--muted);line-height:1.6;">
+        e.l.f. Beauty (ELF) — 7th consecutive year of industry-leading growth. FY2026 net sales +25% to $1.64B. Rhode acquisition (Hailey Bieber's brand) adding scale. Tariff headwinds compressing margins. Stock down ~65% from 52-week high of $150.99.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Upcoming Events</div>
+      <div class="earnings-cal">
+        <div class="ec-item"><span class="ec-ticker">ELF</span><span style="font-size:11px">FY2027 Q1 Earnings</span><span class="ec-date">Aug 2026◈</span></div>
+        <div class="ec-item"><span class="ec-ticker">ELF</span><span style="font-size:11px">Q4 FY2026 — JUST REPORTED</span><span class="ec-date" style="color:var(--green)">May 20, 2026 ✓</span></div>
+        <div class="ec-item"><span class="ec-ticker">ULTA</span><span style="font-size:11px">Q1 FY2026 Earnings</span><span class="ec-date">Jun 5, 2026◈</span></div>
+        <div class="ec-item"><span class="ec-ticker">ELF</span><span style="font-size:11px">Investor Day / Strategy Update</span><span class="ec-date">TBD◈</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MARKET SNAPSHOT -->
+  <div class="micro" style="margin-bottom:8px;">Market Snapshot</div>
+  <div class="snap-grid">
+    <div class="snap-card"><div class="snap-label">S&P 500</div><div class="snap-val">5,802</div><div class="snap-chg dn">-0.3%</div><div class="snap-bar" style="background:var(--red);"></div></div>
+    <div class="snap-card"><div class="snap-label">NASDAQ</div><div class="snap-val">18,450</div><div class="snap-chg dn">-0.5%</div><div class="snap-bar" style="background:var(--red);"></div></div>
+    <div class="snap-card"><div class="snap-label">VIX</div><div class="snap-val">19.4</div><div class="snap-chg dn">-4.2%</div><div class="snap-bar" style="background:var(--green);"></div></div>
+    <div class="snap-card"><div class="snap-label">10-Yr Yield</div><div class="snap-val">4.52%</div><div class="snap-chg up">+2bp</div><div class="snap-bar" style="background:var(--red);"></div></div>
+    <div class="snap-card"><div class="snap-label">Crude WTI</div><div class="snap-val">$61.8</div><div class="snap-chg dn">-0.8%</div><div class="snap-bar" style="background:var(--red);"></div></div>
+    <div class="snap-card"><div class="snap-label">Gold</div><div class="snap-val">$3,312</div><div class="snap-chg up">+0.4%</div><div class="snap-bar" style="background:var(--green);"></div></div>
+    <div class="snap-card"><div class="snap-label">DXY</div><div class="snap-val">99.8</div><div class="snap-chg dn">-0.2%</div><div class="snap-bar" style="background:var(--red);"></div></div>
+    <div class="snap-card"><div class="snap-label">Russell 2K</div><div class="snap-val">2,001</div><div class="snap-chg dn">-0.6%</div><div class="snap-bar" style="background:var(--red);"></div></div>
+    <div class="snap-card"><div class="snap-label">BTC/USD</div><div class="snap-val">$105,400</div><div class="snap-chg up">+1.2%</div><div class="snap-bar" style="background:var(--green);"></div></div>
+    <div class="snap-card"><div class="snap-label">Consumer ETF</div><div class="snap-val">XLP $78.2</div><div class="snap-chg dn">-0.3%</div><div class="snap-bar" style="background:var(--red);"></div></div>
+  </div>
+
+  <!-- ALL REPORTS GRID -->
+  <div class="micro" style="margin-top:20px;margin-bottom:8px;">All Reports</div>
+  <div class="stocks-grid" id="homeStocksGrid">
+    <!-- built by JS -->
+    <div class="add-card" onclick="document.getElementById('addModal').classList.add('open')">
+      <div class="add-icon">＋</div>
+      <div class="add-text">Add a Stock</div>
+      <div style="font-size:10px;color:var(--muted);text-align:center;max-width:160px;">Click to add a new stock to the dashboard</div>
+    </div>
+  </div>
+
+  <div class="howto-card">
+    <div class="card-title">How to Add More Stocks</div>
+    <div class="howto-steps">
+      <div class="howto-step"><div class="hs-num">01</div><div class="hs-text">Click "Add a Stock" in the sidebar or the ＋ card above.</div></div>
+      <div class="howto-step"><div class="hs-num">02</div><div class="hs-text">Enter ticker, name, sector, current price, risk score, and rating.</div></div>
+      <div class="howto-step"><div class="hs-num">03</div><div class="hs-text">A placeholder card is created. Edit the STOCKS array in the JS to add full report data.</div></div>
+      <div class="howto-step"><div class="hs-num">04</div><div class="hs-text">Push the file to GitHub Pages and your dashboard goes live instantly.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MARKET OVERVIEW ═══════════════ -->
+<div class="page" id="page-market">
+  <div class="page-title">Market Overview</div>
+  <div class="page-sub">Consumer / Beauty Sector Focus · May 22, 2026</div>
+
+  <div class="micro" style="margin:14px 0 8px;">Heatmap</div>
+  <div class="heatmap" id="heatmap"></div>
+
+  <div class="micro" style="margin:16px 0 8px;">Beauty & Consumer Peers</div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;" id="peerGrid"></div>
+
+  <div class="two-col">
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title">Sector YTD Performance</div>
+        <div class="sector-bars" id="sectorBars"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Consumer Staples Stocks</div>
+        <table class="big-table" style="font-size:10px;">
+          <thead><tr><th>Ticker</th><th>Name</th><th>Price</th><th>YTD</th><th>Rating</th><th>Risk</th></tr></thead>
+          <tbody>
+            <tr><td class="mono" style="color:var(--pink)">ELF</td><td>e.l.f. Beauty</td><td class="mono">$53.28</td><td class="mono" style="color:var(--red)">-65%</td><td><span class="rating-badge rb-hold">HOLD</span></td><td class="mono" style="color:var(--amber)">52</td></tr>
+            <tr><td class="mono" style="color:var(--muted)">ULTA</td><td>Ulta Beauty</td><td class="mono">$389</td><td class="mono" style="color:var(--red)">-12%</td><td><span class="rating-badge rb-buy">BUY</span></td><td class="mono" style="color:var(--green)">35</td></tr>
+            <tr><td class="mono" style="color:var(--muted)">COTY</td><td>Coty Inc.</td><td class="mono">$6.40</td><td class="mono" style="color:var(--red)">-28%</td><td><span class="rating-badge rb-hold">HOLD</span></td><td class="mono" style="color:var(--red)">72</td></tr>
+            <tr><td class="mono" style="color:var(--muted)">EL</td><td>Estée Lauder</td><td class="mono">$68.20</td><td class="mono" style="color:var(--red)">-18%</td><td><span class="rating-badge rb-hold">HOLD</span></td><td class="mono" style="color:var(--amber)">58</td></tr>
+            <tr><td class="mono" style="color:var(--muted)">REVL</td><td>Revlon (OTC)</td><td class="mono">N/A</td><td class="mono" style="color:var(--muted)">—</td><td><span class="rating-badge rb-sell">SELL</span></td><td class="mono" style="color:var(--red)">88</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title">Risk Distribution</div>
+        <div class="risk-dist-buckets">
+          <div class="rd-bucket"><div class="rd-count mono" style="color:var(--green)">0</div><div class="rd-lbl" style="color:var(--green)">Low Risk</div><div style="font-size:9px;color:var(--muted)">&lt;40</div></div>
+          <div class="rd-bucket"><div class="rd-count mono" style="color:var(--amber)">1</div><div class="rd-lbl" style="color:var(--amber)">Moderate</div><div style="font-size:9px;color:var(--muted)">40–64</div></div>
+          <div class="rd-bucket"><div class="rd-count mono" style="color:var(--red)">0</div><div class="rd-lbl" style="color:var(--red)">High Risk</div><div style="font-size:9px;color:var(--muted)">&gt;65</div></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title">Top Risk-Adjusted Pick</div>
+        <div class="picks-list">
+          <div class="pick-item" onclick="showPage('stock-ELF')">
+            <div class="pi-left"><span class="pi-rank">#1</span><span class="pi-sym">ELF</span><span class="pi-name">e.l.f. Beauty</span></div>
+            <span class="pi-score" style="color:var(--amber)">52</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title">Upcoming Earnings</div>
+        <div class="earnings-cal">
+          <div class="ec-item"><span class="ec-ticker" style="color:var(--green)">ELF ✓</span><span style="font-size:10px">Q4 FY2026 REPORTED</span><span class="ec-date">May 20</span></div>
+          <div class="ec-item"><span class="ec-ticker">ULTA</span><span style="font-size:10px">Q1 FY2026</span><span class="ec-date">Jun 5◈</span></div>
+          <div class="ec-item"><span class="ec-ticker">EL</span><span style="font-size:10px">Q3 FY2026</span><span class="ec-date">Jun 10◈</span></div>
+        </div>
+      </div>
+      <div class="outlook-box">
+        <div class="ob-title">🔍 Market Outlook — Beauty Sector</div>
+        <div class="ob-prose">The affordable beauty segment faces a bifurcated environment: strong value consumers favor e.l.f.'s price points while tariff headwinds (avg 55% in FY2026) compress margins industry-wide. China-sourced inventory remains under pressure. Rhode acquisition adds premiumization optionality. FY2027 guidance of 12–14% growth with stable margins signals cautious optimism.</div>
+        <div class="ob-tags">
+          <span class="ob-tag">Tariff Pressure</span><span class="ob-tag">Value Consumer</span><span class="ob-tag">M&A Integration</span><span class="ob-tag">International Expansion</span><span class="ob-tag">Skincare Pivot</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ALL STOCKS TABLE ═══════════════ -->
+<div class="page" id="page-table">
+  <div class="page-title">All Stocks Table</div>
+  <div class="page-sub">Full coverage universe · sortable view</div>
+  <table class="big-table">
+    <thead>
+      <tr>
+        <th>Ticker</th><th>Company</th><th>Sector</th><th>Price</th><th>52-Wk Δ</th>
+        <th>P/E</th><th>Mkt Cap</th><th>Rating</th><th>Risk</th><th>Bar</th><th>Open</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<!-- ═══════════════ SECTOR HUB ═══════════════ -->
+<div class="page" id="page-sector">
+  <div class="page-title">Sector Hub</div>
+  <div class="page-sub">Beauty & Consumer Staples — S&P Classification</div>
+  <div class="sector-tabs" id="sectorTabs"></div>
+  <div id="sectorPanels"></div>
+</div>
+
+<!-- ═══════════════ ELF STOCK DETAIL ═══════════════ -->
+<div class="page" id="page-stock-ELF">
+  <!-- HEADER -->
+  <div class="detail-header">
+    <div class="dh-left">
+      <div class="dh-ticker">ELF</div>
+      <div class="dh-name">e.l.f. Beauty, Inc.</div>
+      <div class="dh-sector">Consumer Staples · Cosmetics & Personal Care · NYSE</div>
+    </div>
+    <div class="dh-right">
+      <div class="dh-price mono">$53.28</div>
+      <div class="dh-meta">
+        <span class="chg-pill up">+0.30% today</span>
+        <span class="chg-pill dn">-65% vs 52-wk high</span>
+      </div>
+      <div class="dh-meta" style="margin-top:6px;">
+        <span class="dh-meta-item">Cap <span>$3.1B</span></span>
+        <span class="dh-meta-item">P/E <span>~121x GAAP</span></span>
+        <span class="dh-meta-item">Fwd P/E <span>~14.3x</span></span>
+        <span class="dh-meta-item">As of <span>May 22, 2026</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUB-TABS -->
+  <div class="subtabs">
+    <div class="subtab active" onclick="showSubTab('ELF',1,this)">📊 Page 1 — Fundamentals</div>
+    <div class="subtab" onclick="showSubTab('ELF',2,this)">📋 Page 2 — Outlook</div>
+  </div>
+
+  <!-- ── PAGE 1 FUNDAMENTALS ── -->
+  <div class="subpage active" id="ELF-sub1">
+
+    <!-- RISK GAUGE + KPI -->
+    <div class="gauge-kpi">
+      <div class="gauge-box">
+        <div class="micro">Composite Risk</div>
+        <div class="gauge-num" style="color:var(--amber)">52</div>
+        <div class="gauge-label" style="color:var(--muted)">/ 100</div>
+        <div class="gauge-tier" style="color:var(--amber)">⚠ MODERATE RISK</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.4;">Tariff compression + integration costs offset by strong brand momentum</div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-tile"><div class="kpi-lbl">P/E (TTM GAAP)</div><div class="kpi-val mono">~121x</div><div class="kpi-delta" style="background:rgba(255,77,109,.15);color:var(--red)">↑ Elevated</div></div>
+        <div class="kpi-tile"><div class="kpi-lbl">Fwd P/E (adj)</div><div class="kpi-val mono">14.3x</div><div class="kpi-delta" style="background:rgba(0,208,132,.15);color:var(--green)">↓ Attractive</div></div>
+        <div class="kpi-tile"><div class="kpi-lbl">FY2026 Rev Growth</div><div class="kpi-val mono">+25%</div><div class="kpi-delta" style="background:rgba(0,208,132,.15);color:var(--green)">↑ Strong</div></div>
+        <div class="kpi-tile"><div class="kpi-lbl">Gross Margin</div><div class="kpi-val mono">70.3%</div><div class="kpi-delta" style="background:rgba(255,181,71,.15);color:var(--amber)">→ Stable</div></div>
+        <div class="kpi-tile"><div class="kpi-lbl">D/E Ratio</div><div class="kpi-val mono">0.80x</div><div class="kpi-delta" style="background:rgba(255,181,71,.15);color:var(--amber)">→ Watch</div></div>
+        <div class="kpi-tile"><div class="kpi-lbl">FCF (TTM)</div><div class="kpi-val mono">$215M</div><div class="kpi-delta" style="background:rgba(0,208,132,.15);color:var(--green)">↑ Healthy</div></div>
+      </div>
+    </div>
+
+    <!-- RISK BREAKDOWN -->
+    <div class="risk-breakdown">
+      <div class="card-title">Risk Score Breakdown</div>
+      <div class="rb-row">
+        <div class="rb-name">📈 Valuation Risk</div>
+        <div class="rb-weight">35% weight</div>
+        <div class="rb-bar-wrap"><div class="risk-bar-track"><div class="risk-bar-fill" style="width:57%;background:var(--amber);"></div></div></div>
+        <div class="rb-score mono" style="color:var(--amber)">20/35</div>
+        <div class="rb-pct">57%</div>
+      </div>
+      <div class="rb-row">
+        <div class="rb-name">🏦 Financial Health Risk</div>
+        <div class="rb-weight">35% weight</div>
+        <div class="rb-bar-wrap"><div class="risk-bar-track"><div class="risk-bar-fill" style="width:46%;background:var(--amber);"></div></div></div>
+        <div class="rb-score mono" style="color:var(--amber)">16/35</div>
+        <div class="rb-pct">46%</div>
+      </div>
+      <div class="rb-row">
+        <div class="rb-name">🚀 Growth & Execution Risk</div>
+        <div class="rb-weight">30% weight</div>
+        <div class="rb-bar-wrap"><div class="risk-bar-track"><div class="risk-bar-fill" style="width:53%;background:var(--amber);"></div></div></div>
+        <div class="rb-score mono" style="color:var(--amber)">16/30</div>
+        <div class="rb-pct">53%</div>
+      </div>
+      <div class="rb-row composite-row">
+        <div class="rb-name" style="font-weight:700">COMPOSITE SCORE</div>
+        <div class="rb-weight"></div>
+        <div class="rb-bar-wrap"><div class="risk-bar-track" style="height:6px;"><div class="risk-bar-fill" style="width:52%;background:var(--amber);height:6px;"></div></div></div>
+        <div class="rb-score"><span class="composite-score" style="background:rgba(255,181,71,.15);color:var(--amber)">52</span></div>
+        <div class="rb-pct"></div>
+      </div>
+    </div>
+
+    <!-- VALUATION METRICS -->
+    <div class="metric-section">
+      <div class="metric-section-title">📊 Valuation Metrics</div>
+      <div class="metric-cards">
+        <div class="metric-card amber"><div class="mc-label">P/E Ratio (TTM GAAP)</div><div class="mc-val mono">~121x</div><div class="mc-context">Inflated by one-time Rhode earnout charge ($57.6M fair value adj). Adj P/E ~16–17x is far more relevant.</div><span class="mc-status mcs-amber">DISTORTED</span></div>
+        <div class="metric-card green"><div class="mc-label">Fwd P/E (Adj EPS)</div><div class="mc-val mono">14.3x</div><div class="mc-context">Based on FY2027 adj EPS guidance of $3.27–$3.32. Near sector median of ~14x for CPG — attractive for this growth rate.</div><span class="mc-status mcs-green">ATTRACTIVE</span></div>
+        <div class="metric-card green"><div class="mc-label">EV/EBITDA (TTM)</div><div class="mc-val mono">20.8x</div><div class="mc-context">Elevated vs. CPG peers but partially justified by 25% revenue growth. FY2027 fwd EV/EBITDA closer to ~13x.</div><span class="mc-status mcs-amber">MODERATE</span></div>
+        <div class="metric-card amber"><div class="mc-label">P/S Ratio (TTM)</div><div class="mc-val mono">2.3x</div><div class="mc-context">Well below ELF's 5-year avg of ~6x. Stock has de-rated significantly. Sector median ~1.0x — premium warranted for growth.</div><span class="mc-status mcs-green">FAIR VALUE</span></div>
+        <div class="metric-card amber"><div class="mc-label">PEG Ratio</div><div class="mc-val mono">~2.6x</div><div class="mc-context">Using GAAP earnings — elevated. On adj basis closer to 1.1x given FY2027 growth normalization. Monitor carefully.</div><span class="mc-status mcs-amber">WATCH</span></div>
+        <div class="metric-card green"><div class="mc-label">P/FCF Ratio</div><div class="mc-val mono">14.5x</div><div class="mc-context">FCF of ~$215M vs. $3.1B market cap. Strong FCF conversion despite tariff headwinds. Below 5-yr avg of 80x+.</div><span class="mc-status mcs-green">ATTRACTIVE</span></div>
+      </div>
+    </div>
+
+    <!-- FINANCIAL HEALTH -->
+    <div class="metric-section">
+      <div class="metric-section-title">🏦 Financial Health</div>
+      <div class="metric-cards">
+        <div class="metric-card green"><div class="mc-label">Current Ratio</div><div class="mc-val mono">2.76x</div><div class="mc-context">Solid short-term liquidity. Above 2x indicates comfortable coverage of current obligations.</div><span class="mc-status mcs-green">HEALTHY</span></div>
+        <div class="metric-card amber"><div class="mc-label">Debt / Equity</div><div class="mc-val mono">0.80x</div><div class="mc-context">Debt rose to ~$926M (from ~$154M a year ago) to fund the $800M Rhode acquisition. Net debt ~$729M.</div><span class="mc-status mcs-amber">ELEVATED POST-ACQ</span></div>
+        <div class="metric-card green"><div class="mc-label">Interest Coverage</div><div class="mc-val mono">15.1x</div><div class="mc-context">EBIT comfortably covers interest expense ~15x. Strong coverage despite the new term loan facility.</div><span class="mc-status mcs-green">STRONG</span></div>
+        <div class="metric-card amber"><div class="mc-label">Cash Position</div><div class="mc-val mono">$197M</div><div class="mc-context">$196.8M cash vs. $926M total debt. Net cash position -$729M. Leverage &lt;2x net debt/EBITDA per management.</div><span class="mc-status mcs-amber">WATCH LEVERAGE</span></div>
+        <div class="metric-card green"><div class="mc-label">Capex / Revenue</div><div class="mc-val mono">~1.9%</div><div class="mc-context">$31.6M capex on $1.64B revenue. Asset-light manufacturing model via contract manufacturers in China.</div><span class="mc-status mcs-green">LEAN</span></div>
+        <div class="metric-card green"><div class="mc-label">FCF Yield</div><div class="mc-val mono">~6.9%</div><div class="mc-context">$215M FCF / $3.1B market cap. Attractive FCF yield for a consumer growth company at current depressed price.</div><span class="mc-status mcs-green">ATTRACTIVE</span></div>
+      </div>
+    </div>
+
+    <!-- GROWTH PROFILE -->
+    <div class="metric-section">
+      <div class="metric-section-title">🚀 Growth Profile</div>
+      <div class="metric-cards">
+        <div class="metric-card green"><div class="mc-label">Revenue Growth (FY2026)</div><div class="mc-val mono">+24.6%</div><div class="mc-context">FY2026 net sales $1.64B vs $1.31B prior year. 7th consecutive year of industry-leading growth. Rhode contributed ~$390M.</div><span class="mc-status mcs-green">INDUSTRY-LEADING</span></div>
+        <div class="metric-card amber"><div class="mc-label">Adj EPS Growth (FY2026)</div><div class="mc-val mono">+$3.13◈</div><div class="mc-context">FY2026 adj EPS ~$3.13, up modestly from prior year despite tariff drag. GAAP EPS was $0.44 due to acquisition charges.</div><span class="mc-status mcs-amber">COMPRESSED</span></div>
+        <div class="metric-card green"><div class="mc-label">Rhode Brand Growth</div><div class="mc-val mono">+80%+</div><div class="mc-context">Rhode delivered $390M net sales in FY2026, +80%+ growth. #1 beauty brand at Sephora NA. Global expansion underway.</div><span class="mc-status mcs-green">STANDOUT</span></div>
+        <div class="metric-card amber"><div class="mc-label">Operating Margin</div><div class="mc-val mono">11.6%</div><div class="mc-context">FY2026 adj EBITDA margin ~20% vs. ~23% prior year. Tariffs (~55% avg rate) and marketing investment (24% of sales) pressured margins.</div><span class="mc-status mcs-amber">UNDER PRESSURE</span></div>
+        <div class="metric-card green"><div class="mc-label">Market Share (US Color)</div><div class="mc-val mono">22%</div><div class="mc-context">Achieved 22% US face makeup share. 29 consecutive quarters of market share gains. #2 in mass cosmetics behind L'Oreal.</div><span class="mc-status mcs-green">CATEGORY LEADER</span></div>
+        <div class="metric-card green"><div class="mc-label">Q4 FY2026 Beat</div><div class="mc-val mono">BEAT</div><div class="mc-context">Q4 rev $449.3M vs. $423M est (+6.2%). Adj EPS $0.32 vs. $0.29 est. 29th consecutive quarter of net sales growth.</div><span class="mc-status mcs-green">BEAT CONSENSUS</span></div>
+      </div>
+    </div>
+  </div><!-- /sub1 -->
+
+  <!-- ── PAGE 2 OUTLOOK ── -->
+  <div class="subpage" id="ELF-sub2">
+
+    <!-- QUARTERLY TABLE -->
+    <div class="card" style="margin-bottom:16px;overflow-x:auto;">
+      <div class="card-title">Quarterly Performance (ELF FY ends March 31)</div>
+      <table class="qtable">
+        <thead>
+          <tr><th>Quarter</th><th>Revenue</th><th>vs Est.</th><th>Adj EPS</th><th>Est.</th><th>Beat?</th><th>Gross Margin</th><th>YoY Rev Δ</th><th>Signal</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">Q1 FY26<br><span style="font-size:9px;color:var(--muted)">Jun 2025</span></td>
+            <td class="mono">$353.7M</td><td class="mono" style="color:var(--green)">+Est</td>
+            <td class="mono">$0.59</td><td class="mono">$0.53</td>
+            <td><span class="beat-pill beat-green">BEAT</span></td>
+            <td class="mono">69.0%</td><td class="mono" style="color:var(--green)">+9%</td>
+            <td><span class="beat-pill beat-green">✓ BEAT</span></td>
+          </tr>
+          <tr>
+            <td class="mono">Q2 FY26<br><span style="font-size:9px;color:var(--muted)">Sep 2025</span></td>
+            <td class="mono">$355M◈</td><td class="mono" style="color:var(--amber)">~In line</td>
+            <td class="mono">$0.68</td><td class="mono">$0.68◈</td>
+            <td><span class="beat-pill beat-amber">INLINE</span></td>
+            <td class="mono">~69%◈</td><td class="mono" style="color:var(--green)">~5%◈</td>
+            <td><span class="beat-pill beat-amber">→ INLINE</span></td>
+          </tr>
+          <tr>
+            <td class="mono">Q3 FY26<br><span style="font-size:9px;color:var(--muted)">Dec 2025</span></td>
+            <td class="mono">$489.5M</td><td class="mono" style="color:var(--green)">+7.4%</td>
+            <td class="mono">$1.24</td><td class="mono">$0.61</td>
+            <td><span class="beat-pill beat-green">MASSIVE BEAT</span></td>
+            <td class="mono">~70%◈</td><td class="mono" style="color:var(--green)">+38%</td>
+            <td><span class="beat-pill beat-green">★ BEAT</span></td>
+          </tr>
+          <tr class="highlight">
+            <td class="mono">★ Q4 FY26<br><span style="font-size:9px;color:var(--accent)">Mar 2026 (latest)</span></td>
+            <td class="mono">$449.3M</td><td class="mono" style="color:var(--green)">+6.2%</td>
+            <td class="mono">$0.32</td><td class="mono">$0.29</td>
+            <td><span class="beat-pill beat-green">BEAT</span></td>
+            <td class="mono">~70%◈</td><td class="mono" style="color:var(--green)">+35%</td>
+            <td><span class="beat-pill beat-green">★ BEAT</span></td>
+          </tr>
+          <tr>
+            <td class="mono">◈ Q1 FY27<br><span style="font-size:9px;color:var(--accent)">Jun 2026 (est)</span></td>
+            <td class="mono">~$390M◈</td><td class="mono" style="color:var(--muted)">—</td>
+            <td class="mono">~$0.72◈</td><td class="mono">—</td>
+            <td><span class="beat-pill beat-fwd">◈ FWD EST</span></td>
+            <td class="mono">~70%◈</td><td class="mono" style="color:var(--green)">~10%◈</td>
+            <td><span class="beat-pill beat-fwd">◈ ESTIMATE</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- LATEST EARNINGS UPDATE -->
+    <div class="earnings-box">
+      <div class="eb-header">Q4 FY2026 (Reported May 20, 2026)</div>
+      <div class="eb-headline">e.l.f. Beauty Beats Q4; Rhode Delivers $390M in Net Sales; 29th Consecutive Quarter of Growth</div>
+      <ul class="eb-bullets">
+        <li>Q4 net sales grew 35% YoY to $449.3M, beating the $423M consensus estimate. Rhode contributed ~$113M (34 ppts of growth); organic growth ex-Rhode was ~+1% YoY, within the flat-to-2% guidance range.</li>
+        <li>Full-year FY2026 net sales reached $1.636B (+24.6%), adjusted EBITDA $335M (+13%), and adjusted EPS $3.13. Tariffs averaged 55% in FY2026, more than double the prior year — the #1 headwind.</li>
+        <li>Rhode surpassed $500M in global retail sales, achieved 80%+ net sales growth, and became the #1 beauty brand at Sephora North America. Non-e.l.f. brands now represent 30% of global consumption.</li>
+        <li>FY2027 guidance: net sales growth of 12–14% ($1.84–1.87B), adj EBITDA $379–385M, adj EPS $3.27–$3.32. Guidance assumes ~35% tariff rate (vs. 55% in FY2026).</li>
+      </ul>
+      <div class="eb-quote">
+        "Fiscal 26 marked our 7th consecutive year of net sales and market share gains, and our 29th consecutive quarter of growth. We've built a powerful, disruptive brand portfolio with significant whitespace ahead." — Tarang Amin, Chairman & CEO, e.l.f. Beauty
+      </div>
+    </div>
+
+    <!-- CATALYSTS & RISKS -->
+    <div class="dual-col">
+      <div>
+        <div class="card-title" style="color:var(--green);margin-bottom:10px;">▲ Catalysts</div>
+        <div class="catalyst-card"><div class="cr-title">Rhode Brand Flywheel</div><div class="cr-body">Rhode delivered $390M net sales in FY2026 and became #1 at Sephora NA. International expansion (Australia, UK) barely begun. Massive whitespace in Europe and Asia.</div><span class="impact-pill ip-high">HIGH</span></div>
+        <div class="catalyst-card"><div class="cr-title">Tariff Relief (FY2027 Assumption)</div><div class="cr-body">Management guides FY2027 on a 35% tariff rate vs. 55% in FY2026. If tariffs ease or supply chain diversification accelerates, significant margin upside exists.</div><span class="impact-pill ip-high">HIGH</span></div>
+        <div class="catalyst-card"><div class="cr-title">International Expansion</div><div class="cr-body">International net sales growing rapidly. Record Mecca launch in Australia/New Zealand. UK, Germany, and emerging markets represent large untapped distribution.</div><span class="impact-pill ip-med">MED</span></div>
+        <div class="catalyst-card"><div class="cr-title">Skincare & Category Expansion</div><div class="cr-body">Skincare grew from 9% to 23% of global consumption in 3 years. Naturium acquisition adds credibility. Under-penetrated vs. peers at 70%+ skincare mix.</div><span class="impact-pill ip-med">MED</span></div>
+        <div class="catalyst-card"><div class="cr-title">AI & Digital Marketing Edge</div><div class="cr-body">e.l.f. invests 24% of net sales in marketing/digital — industry-leading. TikTok-native strategy and AI-powered campaigns drive outsized earned media value.</div><span class="impact-pill ip-med">MED</span></div>
+      </div>
+      <div>
+        <div class="card-title" style="color:var(--red);margin-bottom:10px;">▼ Risks</div>
+        <div class="risk-card-item"><div class="cr-title">Tariff Escalation Risk</div><div class="cr-body">~80% of COGS sourced from China. FY2027 guidance assumes 35% tariff rate — if rates escalate back to 55%+, guidance will be missed significantly. Diversification to other countries takes 12–18 months.</div><span class="impact-pill ip-high">HIGH</span></div>
+        <div class="risk-card-item"><div class="cr-title">Rhode Integration & Earnout Liability</div><div class="cr-body">$57.6M fair value earnout charge taken in FY2026. Earnout thresholds aggressive. If Rhode growth decelerates, additional charges or goodwill impairment possible. Debt load ($926M) requires sustained FCF.</div><span class="impact-pill ip-high">HIGH</span></div>
+        <div class="risk-card-item"><div class="cr-title">Organic e.l.f. Brand Slowdown</div><div class="cr-body">Organic Q4 growth was only ~+1% ex-Rhode. The core brand faced unit volume declines of 5 ppts in Q4 following August 2025 price increases. Execution risk in base business.</div><span class="impact-pill ip-med">MED</span></div>
+        <div class="risk-card-item"><div class="cr-title">Competitive Pressure (Mass & Prestige)</div><div class="cr-body">L'Oréal, NYX, Maybelline, and Wet n Wild compete aggressively. Ulta Beauty expansion of private label. TikTok Shop enabling direct competitor access to consumers.</div><span class="impact-pill ip-med">MED</span></div>
+        <div class="risk-card-item"><div class="cr-title">UK / Germany Market Softness</div><div class="cr-body">Management cited softer trends in the UK beauty market and cycling of large international retail launches in Germany. International growth normalizing post-launch headwinds.</div><span class="impact-pill ip-low">LOW</span></div>
+      </div>
+    </div>
+
+    <!-- VERDICT -->
+    <div class="verdict-grid">
+      <div class="card">
+        <span class="consensus-pill" style="background:rgba(0,208,132,.15);color:var(--green)">BUY Consensus (17 analysts)</span>
+        <div class="verdict-prose">
+          e.l.f. Beauty is a rare consumer franchise that has compounded 25%+ annually for seven years. The stock's collapse from $151 to $53 (-65%) reflects tariff fear, GAAP earnings distortion from acquisition accounting, and general risk-off in high-multiple consumer names — not fundamental deterioration. The business generated $1.64B in revenue and $215M in FCF in FY2026, Rhode is firing on all cylinders, and FY2027 guidance implies 12–14% organic growth with adj EPS of $3.27–3.32 (forward P/E of ~14x — near a decade low). The primary risk is tariff escalation beyond the 35% assumed rate. If tariffs remain manageable, ELF looks significantly undervalued at current levels. Moderate risk score of 52 reflects the balancing act between structural growth and near-term macro headwinds.
+        </div>
+      </div>
+      <div class="card">
+        <div class="micro" style="margin-bottom:8px;">Analyst Consensus</div>
+        <div class="rating-spectrum">
+          <div class="rs-seg rs-str-sell">STR SELL</div>
+          <div class="rs-seg rs-sell">SELL</div>
+          <div class="rs-seg rs-hold">HOLD</div>
+          <div class="rs-seg rs-buy active">BUY</div>
+          <div class="rs-seg rs-str-buy">STR BUY</div>
+        </div>
+        <div class="pt-cells">
+          <div class="pt-cell"><div class="pt-cell-lbl">Bear Case</div><div class="pt-cell-val mono" style="color:var(--red)">$45</div></div>
+          <div class="pt-cell"><div class="pt-cell-lbl">Base Case</div><div class="pt-cell-val mono" style="color:var(--amber)">$78</div></div>
+          <div class="pt-cell"><div class="pt-cell-lbl">Bull Case</div><div class="pt-cell-val mono" style="color:var(--green)">$120</div></div>
+        </div>
+        <div class="verdict-meta">
+          <div>17 analysts covering · Avg PT: <span>$78.07</span> (+46%)</div>
+          <div style="margin-top:3px;">Ratings: Strong Buy <span>6</span> · Buy <span>7</span> · Hold <span>4</span></div>
+          <div style="margin-top:3px;">52-Wk Range: <span>$50.13 – $150.99</span></div>
+          <div style="margin-top:3px;">Next Earnings: <span>~Aug 2026 (Q1 FY2027)◈</span></div>
+          <div style="margin-top:3px;">Short Interest: <span>12.5% of float</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sub2 -->
+</div><!-- /stock-ELF -->
+
+<!-- ═══════════════ ADD MODAL ═══════════════ -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">➕ Add a Stock</div>
+    <div class="form-field"><label class="form-label">Ticker Symbol</label><input class="form-input" id="in-ticker" placeholder="e.g. ULTA"></div>
+    <div class="form-field"><label class="form-label">Company Name</label><input class="form-input" id="in-name" placeholder="e.g. Ulta Beauty Inc."></div>
+    <div class="form-field"><label class="form-label">Sector</label><input class="form-input" id="in-sector" placeholder="e.g. Consumer Staples"></div>
+    <div class="form-field"><label class="form-label">Current Price ($)</label><input class="form-input" id="in-price" placeholder="e.g. 389.00"></div>
+    <div class="form-field"><label class="form-label">Risk Score (0–100)</label><input class="form-input" id="in-risk" placeholder="e.g. 38" type="number" min="0" max="100"></div>
+    <div class="form-field"><label class="form-label">Rating</label>
+      <select class="form-select" id="in-rating">
+        <option>STR BUY</option><option>BUY</option><option selected>HOLD</option><option>SELL</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+      <button class="btn-submit" onclick="addStock()">Add Stock</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<div class="page-footer">
+  STOCK RISK TRACKER · e.l.f. Beauty (ELF) Focus · Powered by Claude AI · Data: SEC, StockAnalysis, TradingView, Yahoo Finance, Investing.com · May 22, 2026 · ⚠ For informational purposes only. Not investment advice.
+</div>
+
+<script>
+// ════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════
+const STOCKS = [
+  {
+    id:'ELF',ticker:'ELF',name:'e.l.f. Beauty, Inc.',sector:'Consumer Staples',
+    price:'$53.28',change:'+0.30%',changeDir:'up',
+    change52wk:'-65% vs hi',change52wkDir:'dn',
+    pe:'~121x',mktcap:'$3.1B',w52:'$50–$151',
+    risk:52,rating:'HOLD',
+    ratingClass:'rb-hold',
+    pe2:'Fwd 14.3x',evEbitda:'20.8x',revGrowth:'+24.6%'
+  }
+];
+
+const TAPE_TICKERS = [
+  {sym:'S&P 500',p:'5,802',c:'-0.3%',dir:'dn'},
+  {sym:'ELF',p:'53.28',c:'+0.30%',dir:'up'},
+  {sym:'NASDAQ',p:'18,450',c:'-0.5%',dir:'dn'},
+  {sym:'ULTA',p:'389.10',c:'+0.8%',dir:'up'},
+  {sym:'EL',p:'68.20',c:'-1.2%',dir:'dn'},
+  {sym:'COTY',p:'6.40',c:'-0.4%',dir:'dn'},
+  {sym:'VIX',p:'19.4',c:'-4.2%',dir:'dn'},
+  {sym:'10-YR',p:'4.52%',c:'+2bp',dir:'up'},
+  {sym:'GOLD',p:'3,312',c:'+0.4%',dir:'up'},
+  {sym:'XLP',p:'78.2',c:'-0.3%',dir:'dn'},
+  {sym:'BTC',p:'105,400',c:'+1.2%',dir:'up'},
+  {sym:'WTI',p:'61.8',c:'-0.8%',dir:'dn'},
+  {sym:'DXY',p:'99.8',c:'-0.2%',dir:'dn'},
+  {sym:'REVL',p:'OTC',c:'—',dir:'dn'},
+  {sym:'CELH',p:'32.4',c:'-2.1%',dir:'dn'},
+  {sym:'HIMS',p:'26.7',c:'+3.2%',dir:'up'},
+  {sym:'KVUE',p:'24.2',c:'-0.5%',dir:'dn'},
+  {sym:'ODD',p:'44.8',c:'+1.1%',dir:'up'},
+];
+
+const HEATMAP_DATA = [
+  {sym:'ELF',c:'+0.3%',dir:'up',mag:.3},
+  {sym:'ULTA',c:'+0.8%',dir:'up',mag:.8},
+  {sym:'EL',c:'-1.2%',dir:'dn',mag:1.2},
+  {sym:'COTY',c:'-0.4%',dir:'dn',mag:.4},
+  {sym:'KVUE',c:'-0.5%',dir:'dn',mag:.5},
+  {sym:'CELH',c:'-2.1%',dir:'dn',mag:2.1},
+  {sym:'HIMS',c:'+3.2%',dir:'up',mag:3.2},
+  {sym:'ODD',c:'+1.1%',dir:'up',mag:1.1},
+  {sym:'REVL',c:'—',dir:'dn',mag:.5},
+  {sym:'PG',c:'+0.2%',dir:'up',mag:.2},
+  {sym:'CL',c:'+0.1%',dir:'up',mag:.1},
+  {sym:'KMB',c:'-0.3%',dir:'dn',mag:.3},
+  {sym:'XLP',c:'-0.3%',dir:'dn',mag:.3},
+  {sym:'XLY',c:'-0.7%',dir:'dn',mag:.7},
+];
+
+const SECTORS_INFO = [
+  {name:'Consumer Staples',ytd:'-3.2%',dir:'dn',desc:'Defensive sector under pressure from tariff cost-pass-through uncertainty. Value-oriented brands outperforming prestige. e.l.f. Beauty is the category disruptor.',avgPE:'18x',avgRisk:'45',topPick:'ELF',covered:'1'},
+  {name:'Technology',ytd:'+8.1%',dir:'up',desc:'AI spending cycle continues to drive semiconductor and software outperformance. Cloud spending resilient despite macro uncertainty.',avgPE:'28x',avgRisk:'42',topPick:'MSFT',covered:'0'},
+  {name:'Healthcare',ytd:'+2.4%',dir:'up',desc:'Defensive positioning favored. GLP-1 drugs reshaping consumer health landscape with indirect benefits to beauty/wellness.',avgPE:'22x',avgRisk:'38',topPick:'LLY',covered:'0'},
+  {name:'Financials',ytd:'+5.2%',dir:'up',desc:'Higher-for-longer rates benefiting NIM. Credit quality holding. Regional banks recovering.',avgPE:'14x',avgRisk:'40',topPick:'JPM',covered:'0'},
+];
+
+const SECTOR_BARS = [
+  {label:'Technology',val:'+8.1%',pct:81,up:true},
+  {label:'Financials',val:'+5.2%',pct:52,up:true},
+  {label:'Healthcare',val:'+2.4%',pct:24,up:true},
+  {label:'Industrials',val:'+1.8%',pct:18,up:true},
+  {label:'Energy',val:'-1.5%',pct:15,up:false},
+  {label:'Cons. Staples',val:'-3.2%',pct:32,up:false},
+  {label:'Utilities',val:'-0.8%',pct:8,up:false},
+  {label:'Real Estate',val:'-4.1%',pct:41,up:false},
+];
+
+// ════════════════════════════════════════
+// BUILDERS
+// ════════════════════════════════════════
+function buildTape(){
+  const track = document.getElementById('tapeTrack');
+  let html = '';
+  const items = [...TAPE_TICKERS,...TAPE_TICKERS]; // duplicate for seamless loop
+  items.forEach(t=>{
+    html+=`<div class="tick-item"><span class="tick-sym">${t.sym}</span><span class="tick-p">${t.p}</span><span class="tick-c ${t.dir}">${t.c}</span></div>`;
+  });
+  track.innerHTML = html;
+}
+
+function getRiskColor(r){return r<40?'var(--green)':r<65?'var(--amber)':'var(--red)';}
+function getRiskBg(r){return r<40?'rgba(0,208,132,.15)':r<65?'rgba(255,181,71,.15)':'rgba(255,77,109,.15)';}
+function getRiskClass(r){return r<40?'rb-low':r<65?'rb-mod':'rb-high';}
+
+function buildHomeCards(){
+  const grid = document.getElementById('homeStocksGrid');
+  let html = '';
+  STOCKS.forEach(s=>{
+    const rc = getRiskColor(s.risk);
+    const rf = s.risk+'%';
+    html+=`
+    <div class="stock-card" onclick="showPage('stock-${s.id}')">
+      <div class="sc-top">
+        <span class="ticker-pill">${s.ticker}</span>
+        <span class="sc-risk" style="color:${rc}">${s.risk}</span>
+      </div>
+      <div class="sc-name">${s.name}</div>
+      <div class="sc-sector">${s.sector}</div>
+      <div class="sc-price-row">
+        <span class="sc-price mono">${s.price}</span>
+        <span class="chg-pill ${s.changeDir}">${s.change}</span>
+      </div>
+      <div class="sc-metrics">
+        <div class="sc-metric"><div class="sc-metric-lbl">P/E</div><div class="sc-metric-val mono">${s.pe2||s.pe}</div></div>
+        <div class="sc-metric"><div class="sc-metric-lbl">Mkt Cap</div><div class="sc-metric-val mono">${s.mktcap}</div></div>
+        <div class="sc-metric"><div class="sc-metric-lbl">52-Wk</div><div class="sc-metric-val mono">${s.w52}</div></div>
+      </div>
+      <div class="risk-bar-wrap">
+        <div class="micro" style="margin-bottom:4px;">Risk Score ${s.risk}/100</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:${rf};background:${rc};"></div></div>
+      </div>
+      <div class="sc-bottom">
+        <span class="rating-badge ${s.ratingClass}">${s.rating}</span>
+        <span class="sc-arrow">→</span>
+      </div>
+    </div>`;
+  });
+  // inject before the add card
+  grid.insertAdjacentHTML('afterbegin', html);
+}
+
+function buildTable(){
+  const tbody = document.getElementById('tableBody');
+  let html = '';
+  STOCKS.forEach(s=>{
+    const rc = getRiskColor(s.risk);
+    const rf = s.risk+'%';
+    html+=`<tr>
+      <td class="mono" style="color:var(--pink)">${s.ticker}</td>
+      <td>${s.name}</td>
+      <td style="color:var(--muted);font-size:10px;">${s.sector}</td>
+      <td class="mono">${s.price}</td>
+      <td class="mono" style="color:${s.change52wkDir==='dn'?'var(--red)':'var(--green)'}">${s.change52wk}</td>
+      <td class="mono">${s.pe}</td>
+      <td class="mono">${s.mktcap}</td>
+      <td><span class="rating-badge ${s.ratingClass}">${s.rating}</span></td>
+      <td class="mono" style="color:${rc};font-weight:600">${s.risk}</td>
+      <td style="width:80px;"><div class="risk-bar-track" style="width:70px;"><div class="risk-bar-fill" style="width:${rf};background:${rc};"></div></div></td>
+      <td><button class="open-btn" onclick="showPage('stock-${s.id}')">Open →</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function buildHeatmap(){
+  const el = document.getElementById('heatmap');
+  let html = '';
+  HEATMAP_DATA.forEach(t=>{
+    const alpha = Math.min(.7, .15 + t.mag * .12);
+    const bg = t.dir==='up'?`rgba(0,208,132,${alpha})`:`rgba(255,77,109,${alpha})`;
+    const tc = t.dir==='up'?'var(--green)':'var(--red)';
+    html+=`<div class="hm-tile" style="background:${bg};">
+      <div class="hm-sym" style="color:${tc}">${t.sym}</div>
+      <div class="hm-chg" style="color:${tc}">${t.c}</div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function buildSectorBars(){
+  const el = document.getElementById('sectorBars');
+  if(!el) return;
+  let html='';
+  SECTOR_BARS.forEach(s=>{
+    const c = s.up?'var(--green)':'var(--red)';
+    html+=`<div class="sb-row">
+      <div class="sb-label">${s.label}</div>
+      <div class="sb-bar" style="width:${s.pct*1.2}px;background:${c};opacity:.7;"></div>
+      <div class="sb-val" style="color:${c}">${s.val}</div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function buildPeerGrid(){
+  const el = document.getElementById('peerGrid');
+  if(!el) return;
+  const peers=[
+    {sym:'ELF',price:'$53.28',chg:'+0.30%',up:true,risk:52},
+    {sym:'ULTA',price:'$389',chg:'+0.8%',up:true,risk:35},
+    {sym:'EL',price:'$68.20',chg:'-1.2%',up:false,risk:58},
+    {sym:'COTY',price:'$6.40',chg:'-0.4%',up:false,risk:72},
+    {sym:'CELH',price:'$32.4',chg:'-2.1%',up:false,risk:65},
+  ];
+  let html='';
+  peers.forEach(p=>{
+    const rc=getRiskColor(p.risk);
+    const cc=p.up?'var(--green)':'var(--red)';
+    html+=`<div class="m7-card" style="min-width:0;">
+      <div class="m7-sym">${p.sym}</div>
+      <div class="m7-price mono">${p.price}</div>
+      <div class="m7-chg" style="color:${cc}">${p.chg}</div>
+      <div class="m7-risk" style="color:${rc}">${p.risk}</div>
+      <div class="m7-bar"><div class="m7-bar-fill" style="width:${p.risk}%;background:${rc};"></div></div>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function buildSectors(){
+  const tabsEl = document.getElementById('sectorTabs');
+  const panelsEl = document.getElementById('sectorPanels');
+  const COLORS=['#6c63ff','#00d084','#ff4d6d','#ffb547'];
+  let tabsHTML='', panelsHTML='';
+  SECTORS_INFO.forEach((s,i)=>{
+    const active=i===0?'active':'';
+    tabsHTML+=`<div class="sector-tab ${active}" style="${active?'background:'+COLORS[i%4]+';border-color:'+COLORS[i%4]:''}" onclick="showSector(${i},this)">${s.name}</div>`;
+    const yc=s.dir==='up'?'var(--green)':'var(--red)';
+    panelsHTML+=`<div class="sector-panel ${active}" id="sector-${i}">
+      <div class="sector-header-card">
+        <div class="shc-top">
+          <div>
+            <div style="font-size:16px;font-weight:700;margin-bottom:4px;">${s.name}</div>
+            <div style="font-size:11px;color:var(--muted);max-width:600px;line-height:1.5;">${s.desc}</div>
+          </div>
+          <div class="shc-ytd" style="color:${yc}">${s.ytd}</div>
+        </div>
+        <div class="shc-stats">
+          <div class="shc-stat">Avg P/E: <span>${s.avgPE}</span></div>
+          <div class="shc-stat">Avg Risk: <span>${s.avgRisk}</span></div>
+          <div class="shc-stat">Top Pick: <span>${s.topPick}</span></div>
+          <div class="shc-stat">Covered: <span>${s.covered}</span></div>
+        </div>
+      </div>
+      ${i===0?buildConsumerStaplesCards():'<div style="color:var(--muted);font-size:12px;padding:12px;">No full reports yet for this sector. Add stocks via the modal to populate.</div>'}
+    </div>`;
+  });
+  tabsEl.innerHTML=tabsHTML;
+  panelsEl.innerHTML=panelsHTML;
+}
+
+function buildConsumerStaplesCards(){
+  return `<div class="stocks-grid">
+    <div class="stock-card" onclick="showPage('stock-ELF')">
+      <div class="sc-top"><span class="ticker-pill">ELF</span><span class="sc-risk" style="color:var(--amber)">52</span></div>
+      <div class="sc-name">e.l.f. Beauty, Inc.</div>
+      <div class="sc-sector">Cosmetics · Consumer Staples</div>
+      <div class="sc-price-row"><span class="sc-price mono">$53.28</span><span class="chg-pill up">+0.30%</span></div>
+      <div class="sc-metrics">
+        <div class="sc-metric"><div class="sc-metric-lbl">Fwd P/E</div><div class="sc-metric-val mono">14.3x</div></div>
+        <div class="sc-metric"><div class="sc-metric-lbl">Mkt Cap</div><div class="sc-metric-val mono">$3.1B</div></div>
+        <div class="sc-metric"><div class="sc-metric-lbl">FY26 Rev</div><div class="sc-metric-val mono">+25%</div></div>
+      </div>
+      <div class="risk-bar-wrap">
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:52%;background:var(--amber);"></div></div>
+      </div>
+      <div class="sc-bottom"><span class="rating-badge rb-hold">HOLD</span><span class="sc-arrow">→</span></div>
+    </div>
+  </div>`;
+}
+
+function showSector(idx, el){
+  document.querySelectorAll('.sector-tab').forEach((t,i)=>{
+    const colors=['#6c63ff','#00d084','#ff4d6d','#ffb547'];
+    t.classList.remove('active');
+    t.style.background='';
+    t.style.borderColor='';
+  });
+  el.classList.add('active');
+  el.style.background=['#6c63ff','#00d084','#ff4d6d','#ffb547'][idx%4];
+  el.style.borderColor=['#6c63ff','#00d084','#ff4d6d','#ffb547'][idx%4];
+  document.querySelectorAll('.sector-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('sector-'+idx).classList.add('active');
+}
+
+// ════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const pg = document.getElementById('page-'+id);
+  if(pg) pg.classList.add('active');
+  // highlight nav
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+id+"'"))
+      n.classList.add('active');
+  });
+}
+
+function showSubTab(stockId, num, el){
+  const parent = document.getElementById('page-stock-'+stockId);
+  parent.querySelectorAll('.subtab').forEach(t=>t.classList.remove('active'));
+  parent.querySelectorAll('.subpage').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(stockId+'-sub'+num).classList.add('active');
+}
+
+// ════════════════════════════════════════
+// ADD STOCK
+// ════════════════════════════════════════
+function addStock(){
+  const ticker=document.getElementById('in-ticker').value.trim().toUpperCase();
+  const name=document.getElementById('in-name').value.trim();
+  const sector=document.getElementById('in-sector').value.trim();
+  const price=document.getElementById('in-price').value.trim();
+  const risk=parseInt(document.getElementById('in-risk').value)||50;
+  const rating=document.getElementById('in-rating').value;
+  if(!ticker||!name) return;
+
+  const ratingClass = rating==='STR BUY'?'rb-sbuy':rating==='BUY'?'rb-buy':rating==='SELL'?'rb-sell':'rb-hold';
+  const rc = getRiskColor(risk);
+
+  // Add to STOCKS
+  STOCKS.push({id:ticker,ticker,name,sector,price:'$'+price,change:'—',changeDir:'up',change52wk:'—',change52wkDir:'dn',pe:'—',mktcap:'—',w52:'—',risk,rating,ratingClass,pe2:'—',evEbitda:'—',revGrowth:'—'});
+
+  // Add sidebar entry
+  const navSection = document.querySelector('.nav-section:last-of-type');
+  const entry = document.createElement('div');
+  entry.className='nav-item';
+  entry.setAttribute('onclick',`showPage('stock-${ticker}')`);
+  entry.innerHTML=`<span class="nav-icon">📄</span><span class="nav-name">${ticker} · ${name.split(' ')[0]}</span><span class="risk-badge ${getRiskClass(risk)}">${risk}</span>`;
+  navSection.appendChild(entry);
+
+  // Add placeholder page
+  const placeholderPage = document.createElement('div');
+  placeholderPage.className='page';
+  placeholderPage.id='page-stock-'+ticker;
+  placeholderPage.innerHTML=`
+    <div class="detail-header">
+      <div class="dh-left"><div class="dh-ticker">${ticker}</div><div class="dh-name">${name}</div><div class="dh-sector">${sector}</div></div>
+      <div class="dh-right"><div class="dh-price mono">$${price}</div></div>
+    </div>
+    <div style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;margin-top:16px;">
+      <div style="font-size:32px;margin-bottom:12px;">📋</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Report Data Pending</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;max-width:400px;margin:auto;">Full report data for <strong>${ticker}</strong> has not been entered yet. Update the STOCKS array in the JavaScript section of this HTML file to populate the full dashboard with fundamentals, quarterly data, catalysts, risks, and verdict.</div>
+      <div style="margin-top:16px;padding:12px;background:var(--dim);border-radius:6px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);">Risk Score: <span style="color:${rc}">${risk}</span> · Rating: <span style="color:var(--text)">${rating}</span> · Sector: ${sector}</div>
+    </div>`;
+  document.querySelector('.main').appendChild(placeholderPage);
+
+  document.getElementById('addModal').classList.remove('open');
+  // rebuild home cards
+  const grid = document.getElementById('homeStocksGrid');
+  const addCard = grid.querySelector('.add-card');
+  grid.innerHTML='';
+  grid.appendChild(addCard);
+  buildHomeCards();
+  showPage('stock-'+ticker);
+}
+
+// ════════════════════════════════════════
+// CLOCK
+// ════════════════════════════════════════
+function updateClock(){
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+buildTape();
+buildHomeCards();
+buildTable();
+buildHeatmap();
+buildSectorBars();
+buildPeerGrid();
+buildSectors();
+</script>
+</body>
+</html>
